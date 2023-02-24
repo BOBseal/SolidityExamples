@@ -26,7 +26,7 @@ contract Chat {
 
     struct AllUserStruct{
         string name;
-        string mailId;
+        string nickName;
         address accountAddress;
     }
     address payable owner;
@@ -57,7 +57,7 @@ contract Chat {
     IDCount++;
     }
 
-function likeBlogPost(uint blogID) external {
+  function likeBlogPost(uint blogID) external payable {
     require(checkUserExists(msg.sender), "Please Create an Account First");
     require(userList[msg.sender].blogList.length >= blogID, "Blog ID does not exist");
     require(likedByUser(blogID) == false, "Post already liked by user");
@@ -67,7 +67,7 @@ function likeBlogPost(uint blogID) external {
 
     bytes32 blogKey = keccak256(abi.encodePacked(msg.sender, blogID));
     likedBlogs[blogKey] = true;
-}
+  }
 
 
     function getBlogPosts(address userAddress) external view returns (Blog[] memory) {
@@ -76,19 +76,19 @@ function likeBlogPost(uint blogID) external {
     }
 
 
-    function createAccount(string calldata name , string memory mailId) external {
+    function createAccount(string calldata name , string memory nickName) external {
         require( checkUserExists(msg.sender) == false , "User Already Exists!");
         require(bytes(name).length > 0 , "User Name Cannot Be Empty"); 
-         require(keccak256(bytes(mailId)) != keccak256(bytes("")), "Email address cannot be empty");
+         require(keccak256(bytes(nickName)) != keccak256(bytes("")), "Email address cannot be empty");
         //add function here that checks whether email already exist in the allUserStruct array
        for (uint i = 0; i < getAllUsers.length; i++) {
         require(
-            keccak256(bytes(getAllUsers[i].mailId)) != keccak256(bytes(mailId)),
-            "Email address already registered"
+            keccak256(bytes(getAllUsers[i].nickName)) != keccak256(bytes(nickName)),
+            "NickName already taken"
         );
     }
         userList[msg.sender].name = name;
-        getAllUsers.push(AllUserStruct(name , mailId ,msg.sender));
+        getAllUsers.push(AllUserStruct(name , nickName ,msg.sender));
 
     }
 
@@ -155,6 +155,8 @@ function likeBlogPost(uint blogID) external {
     function getAllAppUsers() public view returns ( AllUserStruct[] memory ){
         return getAllUsers;
     }
+
+
 }
 //to-do later
 //add donation function
