@@ -7,6 +7,7 @@ contract Chat {
         friend[] friendList;
         Blog[] blogList;
         Task[] taskList;
+        Transactions[] transactionList;
     }
     struct friend{
         address pubKey;
@@ -38,6 +39,15 @@ contract Chat {
         bool completed;
         uint TaskCompletedAt;
     }
+    struct Transactions{
+        uint transactionCounter;
+        address to;
+        address from;
+        uint amount;
+        string tagdescription;
+        uint transactionTime;
+        string transactionHash;
+    }
     address payable owner;
      constructor() {
         owner = payable(msg.sender);
@@ -45,11 +55,21 @@ contract Chat {
         TuskNum = 1;
     }
     AllUserStruct[] getAllUsers;
+    uint transactionCounter;
     uint TuskNum;
     uint IDCount;
     mapping(address => user) userList;
     mapping(bytes32 => message[]) allMessages;
     mapping(bytes32 => bool) likedBlogs;
+
+
+    function SendEth(address to , address from ,uint amount , string calldata tagdescription , string calldata transactionHash) external{
+        require (checkUserExists(msg.sender), "Please Create an Account First");
+        Transactions memory newTrans= Transactions(0 , to , from , amount , tagdescription , block.timestamp , transactionHash);
+        transactionCounter ++ ;
+        userList[msg.sender].transactionList.push(newTrans);
+    }
+
 
     function addTask(string calldata TitleTask, string calldata Description) external{
          require (checkUserExists(msg.sender), "Please Create an Account First");
