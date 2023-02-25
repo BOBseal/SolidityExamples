@@ -81,7 +81,6 @@ contract Chat {
          TuskNum++;
      }
     function getAllTasks() external view returns(Task[] memory){
-    require(checkUserExists(msg.sender), "Please Create an Account First");
     return userList[msg.sender].taskList;
     } 
     function markTaskCompleted(uint taskNo) external {
@@ -108,7 +107,6 @@ contract Chat {
     }
 
     function getBlogPosts(address userAddress) external view returns (Blog[] memory) {
-        require(checkUserExists(msg.sender), "Please Create an Account First");
         require(checkUserExists(userAddress), "User Not Valid");
         return userList[userAddress].blogList;
     }
