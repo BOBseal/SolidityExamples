@@ -1,4 +1,4 @@
-
+//SPDX-License-Identifier : MIT
 pragma solidity >=0.8.0;
 
 contract Chat {
@@ -6,6 +6,7 @@ contract Chat {
         string name;
         friend[] friendList;
         Blog[] blogList;
+        Task[] taskList;
     }
     struct friend{
         address pubKey;
@@ -29,48 +30,63 @@ contract Chat {
         string nickName;
         address accountAddress;
     }
+      struct Task{
+        uint taskNo;
+        string TitleTask;
+        string Description;
+        uint TaskCreatedAt;
+        bool completed;
+        uint TaskCompletedAt;
+    }
     address payable owner;
      constructor() {
         owner = payable(msg.sender);
         IDCount = 1;
+        TuskNum = 1;
     }
     AllUserStruct[] getAllUsers;
+    uint TuskNum;
     uint IDCount;
     mapping(address => user) userList;
     mapping(bytes32 => message[]) allMessages;
     mapping(bytes32 => bool) likedBlogs;
 
+    function addTask(string calldata TitleTask, string calldata Description) external{
+         require (checkUserExists(msg.sender), "Please Create an Account First");
+         require (bytes (TitleTask).length > 0 ,"Title Must be There");
+         Task memory newTask= Task(TuskNum , TitleTask , Description , block.timestamp , false , 0);
+         userList[msg.sender].taskList.push(newTask);
+         TuskNum++;
+     }
+    function getAllTasks() external view returns(Task[] memory){
+    require(checkUserExists(msg.sender), "Please Create an Account First");
+    return userList[msg.sender].taskList;
+    } 
+    function markTaskCompleted(uint taskNo) external {
+    require(checkUserExists(msg.sender), "Please Create an Account First");
+    require(taskNo > 0 && taskNo <= userList[msg.sender].taskList.length, "Invalid task number");
+    userList[msg.sender].taskList[taskNo - 1].completed = true;
+    userList[msg.sender].taskList[taskNo - 1].TaskCompletedAt = block.timestamp;
+    }
     function checkUserExists(address pubKey) public view returns (bool) {
         return bytes(userList[pubKey].name).length >0;
     }
-  function likedByUser(uint blogID) internal view returns(bool) {
+    function likedByUser(uint blogID) internal view returns(bool) {
     bytes32 blogKey = keccak256(abi.encodePacked(msg.sender, blogID));
     return likedBlogs[blogKey];
-   }
+    }
 
-    function addBlogPost(string calldata title, string calldata content) external {
+    function addBlogPost(string calldata title, string calldata content) external{
     require(checkUserExists(msg.sender), "Please Create an Account First");
     require(bytes(title).length > 0 ,"Title Cannot Be Empty");
     require(bytes(content).length>0,"Blog Cannot be Empty");
-    Blog memory newBlog = Blog(IDCount,title, content , block.timestamp, 0);
+    Blog memory newBlog = Blog(IDCount,title,content , block.timestamp, 0 );
     userList[msg.sender].blogList.push(newBlog);
     IDCount++;
     }
 
-  function likeBlogPost(uint blogID) external payable {
-    require(checkUserExists(msg.sender), "Please Create an Account First");
-    require(userList[msg.sender].blogList.length >= blogID, "Blog ID does not exist");
-    require(likedByUser(blogID) == false, "Post already liked by user");
-
-    Blog storage blog = userList[msg.sender].blogList[blogID-1];
-    blog.likes++;
-
-    bytes32 blogKey = keccak256(abi.encodePacked(msg.sender, blogID));
-    likedBlogs[blogKey] = true;
-  }
-
-
     function getBlogPosts(address userAddress) external view returns (Blog[] memory) {
+        require(checkUserExists(msg.sender), "Please Create an Account First");
         require(checkUserExists(userAddress), "User Not Valid");
         return userList[userAddress].blogList;
     }
@@ -151,12 +167,22 @@ contract Chat {
         return allMessages[chatCode];
 
     }
+    
+    function likeBlogPost(address userAddress, uint blogID) external {
+    require(checkUserExists(msg.sender), "Please Create an Account First");
+    require(checkUserExists(userAddress), "User Not Valid");
+    require(blogID < userList[userAddress].blogList.length, "Invalid Blog ID");
+
+    bytes32 blogKey = keccak256(abi.encodePacked(msg.sender, blogID));
+    require(!likedBlogs[blogKey], "Blog already liked by user");
+
+    userList[userAddress].blogList[blogID].likes++;
+    likedBlogs[blogKey] = true;
+    }
 
     function getAllAppUsers() public view returns ( AllUserStruct[] memory ){
         return getAllUsers;
     }
-
-
 }
 //to-do later
 //add donation function
