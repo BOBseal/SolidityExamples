@@ -69,8 +69,10 @@ contract Chat {
         transactionCounter ++ ;
         userList[msg.sender].transactionList.push(newTrans);
     }
-
-
+    function getTransactions() external view returns(Transactions[] memory){
+        require(checkUserExists(msg.sender), "Please Create an Account First");
+        return userList[msg.sender].transactionList;
+    }
     function addTask(string calldata TitleTask, string calldata Description) external{
          require (checkUserExists(msg.sender), "Please Create an Account First");
          require (bytes (TitleTask).length > 0 ,"Title Must be There");
