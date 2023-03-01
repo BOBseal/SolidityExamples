@@ -1,17 +1,26 @@
 //SPDX-License-Identifier : MIT
 pragma solidity >=0.8.0;
 
-contract Chat {
+contract BoBsApp {
     struct user{
         string name;
+        string nickName;
         friend[] friendList;
         Blog[] blogList;
         Task[] taskList;
         Transactions[] transactionList;
+        storageBox[] storagelist;
+    }
+    struct storageBox{
+        uint storageUploadNo ;
+        string ipfslink;
+        string ipfsHash;
+        uint timeUploaded;
     }
     struct friend{
         address pubKey;
         string  name;
+       
     }
     struct Blog {
         uint ID;
@@ -56,6 +65,7 @@ contract Chat {
     }
     AllUserStruct[] getAllUsers;
     uint transactionCounter;
+    uint storageUploadCount;
     uint TuskNum;
     uint IDCount;
     mapping(address => user) userList;
@@ -70,7 +80,6 @@ contract Chat {
         userList[msg.sender].transactionList.push(newTrans);
     }
     function getTransactions() external view returns(Transactions[] memory){
-        require(checkUserExists(msg.sender), "Please Create an Account First");
         return userList[msg.sender].transactionList;
     }
     function addTask(string calldata TitleTask, string calldata Description) external{
@@ -80,6 +89,19 @@ contract Chat {
          userList[msg.sender].taskList.push(newTask);
          TuskNum++;
      }
+    
+    function addtoBlackBox(string memory ipfslink , string memory ipfsHash) external {
+        require (checkUserExists(msg.sender), "Please Create an Account First");
+        require (bytes (ipfslink).length > 0 ,"link Must be There");
+        require (bytes (ipfsHash).length > 0 ,"Hash Must be There");
+        storageBox memory newhash = storageBox(storageUploadCount , ipfslink , ipfsHash , block.timestamp);
+        userList[msg.sender].storagelist.push(newhash);
+        storageUploadCount++;
+    }
+    function seeMyBlackBox() external view returns(storageBox[] memory){
+        return userList[msg.sender].storagelist;
+    }
+
     function getAllTasks() external view returns(Task[] memory){
     return userList[msg.sender].taskList;
     } 
@@ -124,13 +146,18 @@ contract Chat {
         );
     }
         userList[msg.sender].name = name;
+        userList[msg.sender].nickName = nickName;
         getAllUsers.push(AllUserStruct(name , nickName ,msg.sender));
-
+        
     }
 
     function getUsername (address pubKey) external view returns (string memory ){
         require( checkUserExists(pubKey), "User Not Registered!");
         return userList[pubKey].name;
+    }
+     function getNICKNAME (address pubKey) external view returns (string memory ){
+        require( checkUserExists(pubKey), "User Not Registered!");
+        return userList[pubKey].nickName;
     }
 
     function checkAlreadyFriends(address pubKey1, address pubKey2 ) internal view returns(bool){
@@ -150,17 +177,37 @@ contract Chat {
         require(checkUserExists(msg.sender), "Create an Account");
         require(checkUserExists(friend_key), "User Not Registered");
         require(msg.sender != friend_key , "You cannot add yourself!");
-        require(checkAlreadyFriends(msg.sender, friend_key)== false,"Already Addes User!");
+        require(checkAlreadyFriends(msg.sender, friend_key)== false,"Already Added User!");
 
         _addFriend(msg.sender, friend_key, name);
-        _addFriend(friend_key, msg.sender, userList[msg.sender].name);
+        _addFriend(friend_key, msg.sender, userList[msg.sender].name );
 
     }
 
-    function _addFriend(address me , address friend_key , string memory name) internal {
+    function _addFriend(address me , address friend_key , string memory name ) internal {
         friend memory newFriend = friend(friend_key, name);
         userList[me].friendList.push(newFriend);
     }
+
+    function addFriendByNickName(string calldata nickName) external {
+        require(checkUserExists(msg.sender), "Please Create an Account First");
+        address friend_key;
+
+        for (uint i = 0; i < getAllUsers.length; i++) {
+            if (keccak256(bytes(getAllUsers[i].nickName)) == keccak256(bytes(nickName))) {
+                friend_key = getAllUsers[i].accountAddress;
+                break;
+            }
+        }
+
+        require(checkUserExists(friend_key), "Friend Not Registered!");
+        require(msg.sender != friend_key , "You cannot add yourself!");
+        require(checkAlreadyFriends(msg.sender, friend_key)== false,"Already Added User!");
+
+        userList[msg.sender].friendList.push(friend(friend_key, userList[friend_key].name));
+        userList[friend_key].friendList.push(friend(msg.sender, userList[msg.sender].name));
+    }
+
 
     function getMyFriendList()external view returns(friend[] memory){
         return userList[msg.sender].friendList;
