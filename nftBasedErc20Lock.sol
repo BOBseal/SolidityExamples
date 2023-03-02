@@ -1,4 +1,4 @@
-//SPDX-License-Identifier : MIT
+//SPDX-LICENSE-IDENTIFIER : MIT
 
 pragma solidity ^0.8.0;
 
@@ -12,7 +12,7 @@ contract DepositNFT is ERC721URIStorage, ReentrancyGuard, Ownable {
     using SafeMath for uint256;
     IERC20 public depositToken;
     uint256 public lockDuration;
-    uint256 public depositCap;
+    uint256 public depositCap;       // States and Basics
     uint256 public tokenIdCounter;
     uint256 public totalDeposited;
     address private feeReceiver;
@@ -36,11 +36,16 @@ contract DepositNFT is ERC721URIStorage, ReentrancyGuard, Ownable {
         depositCap = _depositCap;
         feeReceiver = _feeReciever;
     }
-    function deposit(uint256 _amount) external nonReentrant {
+    //deposit and mint function
+   function deposit(uint256 _amount) external nonReentrant {
     require(_amount > 0, "DepositNFT: amount must be greater than zero");
     require(totalDeposited + _amount <= depositCap, "DepositNFT: deposit amount exceeds cap");
-    // Transfer tokens from sender to contract
-    depositToken.transferFrom(msg.sender, address(this), _amount);
+    // Calculate fee amount
+    uint256 feeAmount = _amount / 1000;
+    // Transfer fee amount to fee receiver address
+    depositToken.transfer(feeReceiver, feeAmount);
+    // Transfer tokens from sender to contract (subtracting the fee amount)
+    depositToken.transferFrom(msg.sender, address(this), _amount - feeAmount);
     // Mint NFT to sender
     _safeMint(msg.sender, tokenIdCounter);
     _setTokenURI(tokenIdCounter, uint2str(_amount));
@@ -48,10 +53,11 @@ contract DepositNFT is ERC721URIStorage, ReentrancyGuard, Ownable {
     // Save deposit information to token metadata
     (address depositor, uint256 amount, uint256 timestamp) = (msg.sender, _amount, block.timestamp);
     depositData[tokenIdCounter] = DepositData({depositor: depositor, amount: amount, timestamp: timestamp});
-    // Update total deposited
-    totalDeposited += _amount;
+    // Update total deposited (subtracting the fee amount)
+    totalDeposited += _amount - feeAmount;
     emit TokenMinted(msg.sender, tokenIdCounter, _amount);
     }
+    //helper function for uint to string conversion
     function uint2str(uint256 _i) internal pure returns (string memory str) {
         if (_i == 0) {
             return "0";
@@ -73,6 +79,7 @@ contract DepositNFT is ERC721URIStorage, ReentrancyGuard, Ownable {
         }
         str = string(bstr);
     }
+    //Withdraw with NFT function
     function withdraw(uint256 _tokenId, address _to) external nonReentrant {
     require(_isApprovedOrOwner(msg.sender, _tokenId), "DepositNFT: caller is not owner nor approved");
     // Get deposit information from token metadata
@@ -89,13 +96,16 @@ contract DepositNFT is ERC721URIStorage, ReentrancyGuard, Ownable {
     // Update total deposited
     totalDeposited -= amount;
     }
-    function getDeposit(uint256 _tokenId) public view returns (address depositor, uint256 amount, uint256 timestamp) {
+
+    //helper 
+    function getDeposit(uint256 _tokenId) private view returns (address depositor, uint256 amount, uint256 timestamp) {
         require(_exists(_tokenId), "DepositNFT: invalid token id");
         // Get deposit information from depositData mapping
         depositor = depositData[_tokenId].depositor;
         amount = depositData[_tokenId].amount;
         timestamp = depositData[_tokenId].timestamp;
     }
+    //others
     function setLockDuration(uint256 _lockDuration) external onlyOwner {
         lockDuration = _lockDuration;
     }
