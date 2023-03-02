@@ -1,85 +1,108 @@
-// SPDX-License-Identifier: MIT
+//SPDX-License-Identifier : MIT
 pragma solidity ^0.8.0;
-
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
-import "@openzeppelin/contracts/utils/Address.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract TokenLock is ERC1155, ReentrancyGuard {
-    using Address for address payable;
-    uint256 nftId;
-    using SafeMath for uint256;
-
-    address private _owner;
-    IERC20 private _token;
-    mapping(uint256 => uint256) private _lockTimes;
-
-    constructor(address tokenAddress) ERC1155("BANKPASS") {
-        _owner = msg.sender;
-        _token = IERC20(tokenAddress);
+contract DepositNFT is ERC721URIStorage, ReentrancyGuard, Ownable {
+    IERC20 public depositToken;
+    uint256 public lockDuration;
+    uint256 public depositCap;
+    uint256 public tokenIdCounter;
+    uint256 public totalDeposited;
+    address private feeReceiver;
+    struct DepositData {
+        address depositor;
+        uint256 amount;
+        uint256 timestamp;
     }
-
-    function deposit(uint256 amount) public {
-    require(amount > 0, "Amount must be greater than 0");
-
-    // Prompt user to approve contract to spend tokens
-    require(_token.approve(address(this), amount), "Token approval failed");
-
-    // Calculate fee
-    uint256 fee = amount.mul(1).div(100);
-
-    // Transfer fee to contract owner
-    require(_token.transferFrom(msg.sender, _owner, fee), "Token transfer failed");
-
-    // Transfer tokens from user to contract
-    require(_token.transferFrom(msg.sender, address(this), amount), "Token transfer failed");
-
-    // Mint NFT and associate with deposit data
-    _mint(msg.sender, nftId, 1, abi.encodePacked(msg.sender, amount));
-
-    // Set lock time
-    _lockTimes[nftId] = block.timestamp.add(3600); // 1 hour
-    nftId++;
-
-    // Log NFT ID and contract address
-    emit NftDeposited(nftId);
-}
-
-
-    function withdraw(uint256 tokenId, address to) public {
-        require(balanceOf(msg.sender, tokenId) == 1, "User does not own this token");
-
-        // Get deposit data from NFT metadata
-        (address account, uint256 amount) = abi.decode(getData(tokenId), (address, uint256));
-
-        // Check if lock time is completed
-        require(block.timestamp >= _lockTimes[tokenId], "Lock time not completed");
-
-        // Transfer tokens from contract to user
-        require(_token.transfer(to, amount), "Token transfer failed");
-
-        // Burn NFT
-        _burn(msg.sender, tokenId, 1);
+    event TokenMinted(address indexed owner, uint256 indexed tokenId, uint256 amount);
+    mapping(uint256 => DepositData) private depositData;
+    constructor(
+        string memory _name,
+        string memory _symbol,
+        address _depositToken,
+        uint256 _lockDuration,
+        uint256 _depositCap,
+        address _feeReciever
+    ) ERC721(_name, _symbol) {
+        depositToken = IERC20(_depositToken);
+        lockDuration = _lockDuration;
+        depositCap = _depositCap;
+        feeReceiver = _feeReciever;
     }
-
-    function getData(uint256 tokenId) public view returns (bytes memory) {
-        return abi.encodePacked(IERC1155MetadataURI(address(this)).uri(tokenId));
+    function deposit(uint256 _amount) external nonReentrant {
+    require(_amount > 0, "DepositNFT: amount must be greater than zero");
+    require(totalDeposited + _amount <= depositCap, "DepositNFT: deposit amount exceeds cap");
+    // Transfer tokens from sender to contract
+    depositToken.transferFrom(msg.sender, address(this), _amount);
+    // Mint NFT to sender
+    _safeMint(msg.sender, tokenIdCounter);
+    _setTokenURI(tokenIdCounter, uint2str(_amount));
+    tokenIdCounter++;
+    // Save deposit information to token metadata
+    (address depositor, uint256 amount, uint256 timestamp) = (msg.sender, _amount, block.timestamp);
+    depositData[tokenIdCounter] = DepositData({depositor: depositor, amount: amount, timestamp: timestamp});
+    // Update total deposited
+    totalDeposited += _amount;
+    emit TokenMinted(msg.sender, tokenIdCounter, _amount);
     }
-
-    function setToken(address tokenAddress) public onlyOwner {
-        _token = IERC20(tokenAddress);
+    function uint2str(uint256 _i) internal pure returns (string memory str) {
+        if (_i == 0) {
+            return "0";
+        }
+        uint256 j = _i;
+        uint256 length;
+        while (j != 0) {
+            length++;
+            j /= 10;
+        }
+        bytes memory bstr = new bytes(length);
+        uint256 k = length;
+        while (_i != 0) {
+            k = k-1;
+            uint8 temp = (48 + uint8(_i - _i / 10 * 10));
+            bytes1 b1 = bytes1(temp);
+            bstr[k] = b1;
+            _i /= 10;
+        }
+        str = string(bstr);
     }
-
-    function setOwner(address newOwner) public onlyOwner {
-        _owner = newOwner;
+    function withdraw(uint256 _tokenId, address _to) external nonReentrant {
+    require(_isApprovedOrOwner(msg.sender, _tokenId), "DepositNFT: caller is not owner nor approved");
+    // Get deposit information from token metadata
+    (address depositor, uint256 amount, uint256 timestamp) = getDeposit(_tokenId);
+    require(block.timestamp >= timestamp + lockDuration, "DepositNFT: lock duration has not elapsed");
+    // Calculate fee amount
+    uint256 feeAmount = amount / 1000;
+    // Transfer fee amount to fee receiver address
+    depositToken.transfer(feeReceiver, feeAmount);
+    // Transfer tokens from contract to specified address
+    depositToken.transfer(_to, amount - feeAmount);
+    // Burn NFT
+    _burn(_tokenId);
+    // Update total deposited
+    totalDeposited -= amount;
     }
-
-    event NftDeposited(uint256 indexed nftId);
-
-    modifier onlyOwner() {
-        require(msg.sender == _owner, "Caller is not the owner");
-        _;
+    function getDeposit(uint256 _tokenId) public view returns (address depositor, uint256 amount, uint256 timestamp) {
+        require(_exists(_tokenId), "DepositNFT: invalid token id");
+        // Get deposit information from depositData mapping
+        depositor = depositData[_tokenId].depositor;
+        amount = depositData[_tokenId].amount;
+        timestamp = depositData[_tokenId].timestamp;
+    }
+    function setLockDuration(uint256 _lockDuration) external onlyOwner {
+        lockDuration = _lockDuration;
+    }
+    function setDepositCap(uint256 _depositCap) external onlyOwner {
+        depositCap = _depositCap;
+    }
+    function getAllTokenIds() external view returns (uint256[] memory) {
+    uint256[] memory tokenIds = new uint256[](tokenIdCounter);
+    for (uint256 i = 0; i < tokenIdCounter; i++) {
+        tokenIds[i] = i;
+    }
+    return tokenIds;
     }
 }
