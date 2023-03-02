@@ -17,7 +17,6 @@ contract DepositNFT is ERC721URIStorage, ReentrancyGuard, Ownable {
     uint256 public totalDeposited;
     address private feeReceiver;
     struct DepositData {
-        address depositor;
         uint256 amount;
         uint256 timestamp;
     }
@@ -37,7 +36,7 @@ contract DepositNFT is ERC721URIStorage, ReentrancyGuard, Ownable {
         feeReceiver = _feeReciever;
     }
     //deposit and mint function
-   function deposit(uint256 _amount) external nonReentrant {
+   function depositSingle(uint256 _amount) external nonReentrant {
     require(_amount > 0, "DepositNFT: amount must be greater than zero");
     require(totalDeposited + _amount <= depositCap, "DepositNFT: deposit amount exceeds cap");
     // Calculate fee amount
@@ -51,8 +50,8 @@ contract DepositNFT is ERC721URIStorage, ReentrancyGuard, Ownable {
     _setTokenURI(tokenIdCounter, uint2str(_amount));
     tokenIdCounter++;
     // Save deposit information to token metadata
-    (address depositor, uint256 amount, uint256 timestamp) = (msg.sender, _amount, block.timestamp);
-    depositData[tokenIdCounter] = DepositData({depositor: depositor, amount: amount, timestamp: timestamp});
+    ( uint256 amount, uint256 timestamp) = ( _amount, block.timestamp);
+    depositData[tokenIdCounter] = DepositData({ amount: amount, timestamp: timestamp});
     // Update total deposited (subtracting the fee amount)
     totalDeposited += _amount - feeAmount;
     emit TokenMinted(msg.sender, tokenIdCounter, _amount);
@@ -83,7 +82,7 @@ contract DepositNFT is ERC721URIStorage, ReentrancyGuard, Ownable {
     function withdraw(uint256 _tokenId, address _to) external nonReentrant {
     require(_isApprovedOrOwner(msg.sender, _tokenId), "DepositNFT: caller is not owner nor approved");
     // Get deposit information from token metadata
-    (address depositor, uint256 amount, uint256 timestamp) = getDeposit(_tokenId);
+    ( uint256 amount, uint256 timestamp) = getDeposit(_tokenId);
     require(block.timestamp >= timestamp + lockDuration, "DepositNFT: lock duration has not elapsed");
     // Calculate fee amount
     uint256 feeAmount = amount / 1000;
@@ -98,10 +97,9 @@ contract DepositNFT is ERC721URIStorage, ReentrancyGuard, Ownable {
     }
 
     //helper 
-    function getDeposit(uint256 _tokenId) private view returns (address depositor, uint256 amount, uint256 timestamp) {
+    function getDeposit(uint256 _tokenId) private view returns (uint256 amount, uint256 timestamp) {
         require(_exists(_tokenId), "DepositNFT: invalid token id");
         // Get deposit information from depositData mapping
-        depositor = depositData[_tokenId].depositor;
         amount = depositData[_tokenId].amount;
         timestamp = depositData[_tokenId].timestamp;
     }
