@@ -1,0 +1,107 @@
+//SPDX-LICENSE-IDENTIFIER : MIT
+
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+
+contract DepositNFT is ERC721URIStorage, ReentrancyGuard, Ownable {
+    using SafeMath for uint256;
+    IERC20 public depositToken;
+    uint256 public lockDuration;
+    uint256 public depositCap;       // States and Basics
+    uint256 public tokenIdCounter;
+    uint256 public totalDeposited;
+    address private feeReceiver;
+    struct DepositData {
+        uint256 amount;
+        uint256 timestamp;
+    }
+    event TokenMinted(address indexed owner, uint256 indexed tokenId, uint256 amount);
+    mapping(uint256 => DepositData) private depositData;
+    constructor(
+        string memory _name,
+        string memory _symbol,
+        address _depositToken,
+        uint256 _lockDuration,
+        uint256 _depositCap,
+        address _feeReciever
+    ) ERC721(_name, _symbol) {
+        depositToken = IERC20(_depositToken);
+        lockDuration = _lockDuration;
+        depositCap = _depositCap;
+        feeReceiver = _feeReciever;
+    }
+
+   function deposit(uint256 _amount) external nonReentrant {
+    require(_amount > 0, "DepositNFT: amount must be greater than zero");
+    require(totalDeposited + _amount <= depositCap, "DepositNFT: deposit amount exceeds cap");
+    uint256 feeAmount = _amount / 1000;
+    depositToken.transfer(feeReceiver, feeAmount);
+    depositToken.transferFrom(msg.sender, address(this), _amount - feeAmount);
+    _safeMint(msg.sender, tokenIdCounter);
+    _setTokenURI(tokenIdCounter, uint2str(_amount));
+    tokenIdCounter++;
+    ( uint256 amount, uint256 timestamp) = ( _amount, block.timestamp);
+    depositData[tokenIdCounter] = DepositData({ amount: amount, timestamp: timestamp});
+    totalDeposited += _amount - feeAmount;
+    emit TokenMinted(msg.sender, tokenIdCounter, _amount);
+    }
+
+    function uint2str(uint256 _i) internal pure returns (string memory str) {
+        if (_i == 0) {
+            return "0";
+        }
+        uint256 j = _i;
+        uint256 length;
+        while (j != 0) {
+            length++;
+            j /= 10;
+        }
+        bytes memory bstr = new bytes(length);
+        uint256 k = length;
+        while (_i != 0) {
+            k = k-1;
+            uint8 temp = (48 + uint8(_i - _i / 10 * 10));
+            bytes1 b1 = bytes1(temp);
+            bstr[k] = b1;
+            _i /= 10;
+        }
+        str = string(bstr);
+    }
+    
+    function withdraw(uint256 _tokenId) external nonReentrant {
+    require(_isApprovedOrOwner(msg.sender, _tokenId), "DepositNFT: caller is not owner nor approved");
+    ( uint256 amount, uint256 timestamp) = getDeposit(_tokenId);
+    require(block.timestamp >= timestamp + lockDuration, "DepositNFT: lock duration has not elapsed");
+    uint256 feeAmount = amount / 1000;
+    depositToken.transfer(feeReceiver, feeAmount);
+    depositToken.transfer(msg.sender, amount - feeAmount);
+    _burn(_tokenId);
+    totalDeposited -= amount;
+    }
+
+    function getDeposit(uint256 _tokenId) public view returns (uint256 amount, uint256 timestamp) {
+        require(_exists(_tokenId), "DepositNFT: invalid token id");
+        amount = depositData[_tokenId].amount;
+        timestamp = depositData[_tokenId].timestamp;
+    }
+
+    function setLockDuration(uint256 _lockDuration) external onlyOwner {
+        lockDuration = _lockDuration;
+    }
+    function setDepositCap(uint256 _depositCap) external onlyOwner {
+        depositCap = _depositCap;
+    }
+    function getAllTokenIds() external view returns (uint256[] memory) {
+    uint256[] memory tokenIds = new uint256[](tokenIdCounter);
+    for (uint256 i = 0; i < tokenIdCounter; i++) {
+        tokenIds[i] = i;
+    }
+    return tokenIds;
+    }
+}
+
