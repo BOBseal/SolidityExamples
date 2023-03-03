@@ -1,0 +1,1 @@
+Deposit doesnt save the amount locked data into the nft
