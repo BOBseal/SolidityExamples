@@ -1,50 +1,54 @@
+
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.18;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
+import "@openzeppelin/contracts/utils/Context.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
-contract TokenLocker is Ownable {
+contract MyERC1155 is Context, ERC1155 ,ReentrancyGuard, Ownable{
     using SafeMath for uint256;
+    uint256 public TOKEN_ID;
 
-    mapping(address => mapping(address => uint256)) private _lockedBalances;
-    mapping(address => mapping(address => uint256)) private _unlockTime;
-
-    event TokensLocked(address indexed token, address indexed account, uint256 amount, uint256 unlockTime);
-    event TokensWithdrawn(address indexed token, address indexed account, uint256 amount);
-
-    function lockTokens(address token, uint256 amount, uint256 unlockTime) external onlyOwner {
-        require(amount > 0, "TokenLocker: amount must be greater than zero");
-        IERC20(token).transferFrom(msg.sender, address(this), amount);
-        _lockedBalances[token][msg.sender] = _lockedBalances[token][msg.sender].add(amount);
-        _unlockTime[token][msg.sender] = unlockTime;
-        emit TokensLocked(token, msg.sender, amount, unlockTime);
+    struct NFT{
+        uint256 deposit;
+        uint256 supply;
+        address tokenLocked;
     }
 
-    function withdrawTokens(address token, uint256 amount) external onlyOwner {
-        require(amount > 0, "TokenLocker: amount must be greater than zero");
-        uint256 lockedAmount = _lockedBalances[token][msg.sender];
-        require(lockedAmount >= amount, "TokenLocker: not enough locked tokens");
-        require(block.timestamp >= _unlockTime[token][msg.sender], "TokenLocker: tokens are still locked");
-        _lockedBalances[token][msg.sender] = lockedAmount.sub(amount);
-        IERC20(token).transfer(msg.sender, amount);
-        emit TokensWithdrawn(token, msg.sender, amount);
+    mapping (uint256 => NFT) private _nftInfo;
+
+    constructor() ERC1155("") {}
+
+    function mintNFT(uint256 amount, uint256 deposit, address tokenLocked) public {
+        _mint(_msgSender(), TOKEN_ID, amount, "");
+        _nftInfo[TOKEN_ID] = NFT(deposit,amount, tokenLocked);
+        TOKEN_ID++;
     }
 
-
-    function changeUnlockTime(address token, address account, uint256 newUnlockTime) external onlyOwner {
-        require(_lockedBalances[token][account] > 0, "TokenLocker: no locked tokens for account");
-        require(msg.sender == account , "You're Not Permitted to change other's LockTime");
-        require(block.timestamp < _unlockTime[token][account], "TokenLocker: tokens are already unlocked");
-        _unlockTime[token][account] = newUnlockTime;
+    function getDeposit() public view returns (uint256) {
+        return _nftInfo[TOKEN_ID].deposit;
     }
 
-    function getLockedBalance(address token, address account) external onlyOwner view returns (uint256) {
-        return _lockedBalances[token][account];
+    function getTokenLocked() public view returns (address) {
+        return _nftInfo[TOKEN_ID].tokenLocked;
+    }
+    function getNFTInfo(uint256 id) public view returns (NFT memory) {
+         require(id < TOKEN_ID, "Invalid NFT ID");
+        return _nftInfo[id];
     }
 
-    function getUnlockTime(address token, address account) external onlyOwner view returns (uint256) {
-        return _unlockTime[token][account];
+    function transferNFT(address receiver, uint256 id, uint256 amount) public {
+        safeTransferFrom(msg.sender, receiver, id, amount, "");
     }
+    function burnNFT(uint256 id, uint256 amount) public {
+        _burn(_msgSender(), id, amount);
+        _nftInfo[id].supply = _nftInfo[id].supply.sub(amount);
+    }
+    function remainingSupply(uint256 id) public view returns (uint256) {
+        return _nftInfo[id].supply.sub(balanceOf(_msgSender(), id));
+    }
+
 }
