@@ -4,6 +4,7 @@ pragma solidity ^0.8.18;
 import "./Children/key.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "./Children/valueLocker.sol";
+import "./BASIS/token/TokenERC1155.sol";
 
 contract DepositNFTMinter is IERC721Receiver {
     DepositKey private depositNFT;
