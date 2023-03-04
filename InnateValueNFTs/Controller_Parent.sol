@@ -8,10 +8,15 @@ import "./Children/valueLocker.sol";
 contract DepositNFTMinter is IERC721Receiver {
     DepositKey private depositNFT;
     TokenLocker private tokenLocker;
+    address private feeRecipient;
+    uint256 private feePercentage;
+    
 
-    constructor(DepositNFT _depositNFT, TokenLocker _tokenLocker) {
+    constructor(DepositNFT _depositNFT, TokenLocker _tokenLocker,address _feeRecipient, uint256 _feePercentage) {
         depositNFT = _depositNFT;
         tokenLocker = _tokenLocker;
+         feeRecipient = _feeRecipient;
+        feePercentage = _feePercentage;
     }
     
     function onERC721Received(address operator, address from, uint256 tokenId, bytes calldata data) external returns (bytes4) {
@@ -28,16 +33,27 @@ contract DepositNFTMinter is IERC721Receiver {
         IERC20 depositTokenContract = IERC20(_depositToken);
         depositTokenContract.approve(address(tokenLocker), amount);
         depositTokenContract.transferFrom(msg.sender, address(this) , _amount);
-        tokenLocker.lockTokens(_depositToken, amount, block.timestamp + _lockTime);
+
+        uint256 fee = _amount * feePercentage / 100;
+        uint256 amountAfterFee = _amount - fee;
+        tokenLocker.lockTokens(_depositToken, amountAfterFee, block.timestamp + _lockTime);
+        if (fee > 0) {
+            depositTokenContract.transfer(feeRecipient, fee);
+        }
     }
 
-     function Deposit721forERC20(uint256 _tokenId , address reciever) external {
+    function Deposit721forERC20(uint256 _tokenId , address reciever) external {
         require(msg.sender == depositNFT.ownerOf(_tokenId), "DepositNFTMinter: caller must be NFT owner");
         // transfer and burn the tokens
         (uint256 amount, address token ) = getDepositData(_tokenId);
-        IERC20 tokenContract = IERC20(token);
-        withdrawLockedTokens(token , amount);
-        tokenContract.transferFrom(address(this), reciever , amount);
+        uint256 fee = amount * feePercentage / 100;
+        uint256 amountAfterFee = amount - fee;
+        withdrawLockedTokens(token , amountAfterFee);
+        if (fee > 0) {
+            IERC20 tokenContract = IERC20(token);
+            tokenContract.transfer(feeRecipient, fee);
+        }
+        IERC20(token).transfer(reciever , amountAfterFee);
         Burn(_tokenId);
     }
 
