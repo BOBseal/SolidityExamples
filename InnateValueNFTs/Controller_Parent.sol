@@ -63,17 +63,9 @@ contract DepositNFTMinter is IERC721Receiver {
         }
     }
 
-    function MintFragsWith721(uint256 id , uint256 supplyToMint , address receiver) external {
+    function MintFragsWith721(uint256 id , uint256 supplyToMint) external {
         require(msg.sender == depositNFT.ownerOf(id), "DepositNFTMinter: caller must be NFT owner");
         (uint256 amount, address token ) = getDepositData(id);
-        uint256 fee = amount * feePercentage / 1000;
-        uint256 finalAmt = amount - fee;
-        withdrawLockedTokens(token , finalAmt);
-         if (fee > 0) {
-            IERC20 tokenContract = IERC20(token);
-            tokenContract.transfer(feeRecipient, fee);
-        }
-        IERC20(token).transfer(receiver , finalAmt);
         Burn(id);
         uint256 am = amount / supplyToMint;
         friggit.mint(supplyToMint , am , token);
@@ -87,13 +79,30 @@ contract DepositNFTMinter is IERC721Receiver {
         (uint256 amount, address token ) = getDepositData(_tokenId);
         uint256 fee = amount * feePercentage / 1000;
         uint256 amountAfterFee = amount - fee;
-        withdrawLockedTokens(token , amountAfterFee);
+        tokenLocker.withdrawTokens(token,amount);
         if (fee > 0) {
             IERC20 tokenContract = IERC20(token);
-            tokenContract.transfer(feeRecipient, fee);
+            tokenContract.transferFrom(address(this) , feeRecipient, fee );
         }
-        IERC20(token).transfer(reciever , amountAfterFee);
+        IERC20(token).transferFrom(address(this) , reciever, amountAfterFee);
         Burn(_tokenId);
+    }
+    function fragWithdraw(uint256 id , uint256 supplytoWithdraw , address receiver) external {
+         ( uint256 deposit,  , address tokenid  )=friggit.getDepositData(id);
+        fragdepdatatowithdraw(id , supplytoWithdraw);
+        uint256 finalerc20amt = deposit * supplytoWithdraw;
+        uint256 fee = finalerc20amt * feePercentage / 1000;
+        uint256 amountAfterFee = finalerc20amt - fee;
+        if (fee > 0) {
+            IERC20 tokenContract = IERC20(tokenid);
+            tokenContract.transferFrom(address(this) , feeRecipient, fee );
+        }
+        tokenLocker.withdrawTokens(tokenid,finalerc20amt);
+        IERC20(tokenid).transferFrom(address(this), receiver, amountAfterFee);
+    }
+    function fragdepdatatowithdraw(uint256 id , uint256 supplytoWithdraw)internal  {
+        friggit.safeTransferFrom(msg.sender, address(this), id, supplytoWithdraw, "");
+        friggit.burnNFT(id , supplytoWithdraw);
     }
 
     function getDepositData(uint256 _tokenId) internal view returns(uint256 amount, address depositToken){
