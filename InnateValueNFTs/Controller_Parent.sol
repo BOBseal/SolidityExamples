@@ -1,23 +1,25 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.18;
 
-import "./Children/key.sol";
+import "../Children/child1-NftThatHasData.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
-import "./Children/valueLocker.sol";
-import "./BASIS/token/TokenERC1155.sol";
+import "../Children/locker-Child.sol";
+import "../Children/721fragments.sol";
 
 contract DepositNFTMinter is IERC721Receiver {
-    DepositKey private depositNFT;
+    DepositNFT private depositNFT;
     TokenLocker private tokenLocker;
+    FRAGMENTS private friggit;
     address private feeRecipient;
     uint256 private feePercentage;
     
 
-    constructor(DepositNFT _depositNFT, TokenLocker _tokenLocker,address _feeRecipient, uint256 _feePercentage) {
+    constructor(DepositNFT _depositNFT, TokenLocker _tokenLocker,address _feeRecipient, uint256 _feePercentage , FRAGMENTS fragmenterAddress) {
         depositNFT = _depositNFT;
         tokenLocker = _tokenLocker;
          feeRecipient = _feeRecipient;
         feePercentage = _feePercentage;
+        friggit = fragmenterAddress;
     }
     
     function onERC721Received(address operator, address from, uint256 tokenId, bytes calldata data) external returns (bytes4) {
@@ -35,7 +37,7 @@ contract DepositNFTMinter is IERC721Receiver {
         depositTokenContract.approve(address(tokenLocker), amount);
         depositTokenContract.transferFrom(msg.sender, address(this) , _amount);
 
-        uint256 fee = _amount * feePercentage / 100;
+        uint256 fee = _amount * feePercentage / 1000;
         uint256 amountAfterFee = _amount - fee;
         tokenLocker.lockTokens(_depositToken, amountAfterFee, block.timestamp + _lockTime);
         if (fee > 0) {
@@ -43,11 +45,47 @@ contract DepositNFTMinter is IERC721Receiver {
         }
     }
 
+    function MintFragsWithERC20 (uint256 amountorSupply , uint256 depositedAmt , address depositToken , uint256 lockingTimeMin ) external {
+        require ( amountorSupply > 0 , "Supply to Mint and deposit amount must not be empty");
+         require ( depositedAmt > 0 , "Supply to Mint and deposit amount must not be empty");
+        uint256 amm = depositedAmt / amountorSupply; 
+        friggit.mint(amountorSupply , amm , depositToken);
+        uint256 tokenID = friggit.TOKEN_ID() - 1 ;
+        (uint256 deposit , uint256 supply , address tokenLocked) = friggit.getDepositData(tokenID);
+        friggit.transfer(msg.sender ,tokenID, supply );
+        IERC20 tokenContract = IERC20(tokenLocked);
+        tokenContract.transferFrom(msg.sender , address(this) , deposit);
+        uint256 fee = deposit * feePercentage / 1000;
+        uint256 amtAfterfee = deposit - fee ;
+        tokenLocker.lockTokens( tokenLocked , amtAfterfee , block.timestamp + lockingTimeMin);
+         if (fee > 0) {
+            tokenContract.transfer(feeRecipient, fee);
+        }
+    }
+
+    function MintFragsWith721(uint256 id , uint256 supplyToMint , address receiver) external {
+        require(msg.sender == depositNFT.ownerOf(id), "DepositNFTMinter: caller must be NFT owner");
+        (uint256 amount, address token ) = getDepositData(id);
+        uint256 fee = amount * feePercentage / 1000;
+        uint256 finalAmt = amount - fee;
+        withdrawLockedTokens(token , finalAmt);
+         if (fee > 0) {
+            IERC20 tokenContract = IERC20(token);
+            tokenContract.transfer(feeRecipient, fee);
+        }
+        IERC20(token).transfer(receiver , finalAmt);
+        Burn(id);
+        uint256 am = amount / supplyToMint;
+        friggit.mint(supplyToMint , am , token);
+        uint256 fragID = friggit.TOKEN_ID() - 1 ;
+        friggit.transfer(msg.sender ,fragID , supplyToMint);
+    }
+
     function Deposit721forERC20(uint256 _tokenId , address reciever) external {
         require(msg.sender == depositNFT.ownerOf(_tokenId), "DepositNFTMinter: caller must be NFT owner");
         // transfer and burn the tokens
         (uint256 amount, address token ) = getDepositData(_tokenId);
-        uint256 fee = amount * feePercentage / 100;
+        uint256 fee = amount * feePercentage / 1000;
         uint256 amountAfterFee = amount - fee;
         withdrawLockedTokens(token , amountAfterFee);
         if (fee > 0) {
@@ -81,4 +119,3 @@ contract DepositNFTMinter is IERC721Receiver {
         return tokenLocker.getUnlockTime(_token, _account);
     }
 }
-
