@@ -28,15 +28,15 @@ contract FRAGMENTS is Context, ERC1155 ,ReentrancyGuard, Ownable{
     function getDeposit() external onlyOwner view returns (uint256) {
         return _nftInfo[TOKEN_ID].deposit;
     }
-     function getDepositData(uint256 id) external onlyOwner view returns (uint256 deposit , uint256 supply , address tokenLocked) {
+     function getDepositData(uint256 id) external view returns (uint256 deposit , uint256 supply , address tokenLocked) {
         deposit = _nftInfo[id].deposit;
         supply = _nftInfo[id].supply;
         tokenLocked = _nftInfo[id].tokenLocked;
     }
-    function getTokenLocked() external onlyOwner view returns (address) {
+    function getTokenLocked() external view returns (address) {
         return _nftInfo[TOKEN_ID].tokenLocked;
     }
-    function getNFTInfo(uint256 id) external onlyOwner view returns (NFT memory) {
+    function getNFTInfo(uint256 id) external view returns (NFT memory) {
          require(id < TOKEN_ID, "Invalid NFT ID");
         return _nftInfo[id];
     }
@@ -47,8 +47,9 @@ contract FRAGMENTS is Context, ERC1155 ,ReentrancyGuard, Ownable{
         _burn(_msgSender(), id, amount);
         _nftInfo[id].supply = _nftInfo[id].supply.sub(amount);
     }
-   function RemainingSupplyofID(uint256 id) external onlyOwner view returns(uint256) {
+   function RemainingSupplyofID(uint256 id) external view returns(uint256) {
        return _nftInfo[id].supply;
    }
 
 }
+

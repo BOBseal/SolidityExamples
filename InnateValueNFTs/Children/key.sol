@@ -9,7 +9,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
-contract DepositKey is ERC721URIStorage, ReentrancyGuard, Ownable {
+contract DepositNFT is ERC721URIStorage, ReentrancyGuard, Ownable {
     using SafeMath for uint256;
 
     // States and Basics
@@ -56,7 +56,7 @@ contract DepositKey is ERC721URIStorage, ReentrancyGuard, Ownable {
         str = string(bstr);
     }
 
-    function burnKey(uint256 _tokenId) external onlyOwner nonReentrant {
+    function burnKey(uint256 _tokenId) external nonReentrant {
         require(_isApprovedOrOwner(msg.sender, _tokenId), "DepositNFT: caller is not owner nor approved");
         _burn(_tokenId);
     }

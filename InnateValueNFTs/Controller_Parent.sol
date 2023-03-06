@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.18;
 
-import "../Children/child1-NftThatHasData.sol";
+import "../Children/key.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
-import "../Children/locker-Child.sol";
-import "../Children/721fragments.sol";
+import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
+import "./Children/valueLocker.sol";
+import "./Children/fragments.sol";
 
-contract DepositNFTMinter is IERC721Receiver {
+
+  contract DepositNFTMinter is IERC721Receiver , IERC1155Receiver{
     DepositNFT private depositNFT;
     TokenLocker private tokenLocker;
     FRAGMENTS private friggit;
@@ -25,7 +27,13 @@ contract DepositNFTMinter is IERC721Receiver {
     function onERC721Received(address operator, address from, uint256 tokenId, bytes calldata data) external returns (bytes4) {
         return IERC721Receiver.onERC721Received.selector;
     }
+     function onERC1155Received(address operator, address from, uint256 id, uint256 value, bytes calldata data) external override returns(bytes4) {
+        return IERC1155Receiver.onERC1155Received.selector;
+    }
 
+    function onERC1155BatchReceived(address operator, address from, uint256[] calldata ids, uint256[] calldata values, bytes calldata data) external override returns(bytes4) {
+        return IERC1155Receiver.onERC1155BatchReceived.selector;
+    }
     function mintDeposit721(uint256 _amount, address _depositToken, uint256 _lockTime) external {
         require(_amount > 0, "DepositNFTMinter: amount must be greater than zero");
         depositNFT.mintKey(_amount, _depositToken);
@@ -128,3 +136,4 @@ contract DepositNFTMinter is IERC721Receiver {
         return tokenLocker.getUnlockTime(_token, _account);
     }
 }
+
