@@ -1,22 +1,21 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.7.0;
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
+import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
+import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol";
 
-interface IERC20 {
-    function transfer(address recipient, uint256 amount) external returns (bool);
-}
-interface IUniswapV2Router02 {
-    function getAmountsOut(uint256 amountIn, address[] memory path) external view returns (uint256[] memory amounts);
-    function swapExactTokensForTokens(uint256 amountIn, uint256 amountOutMin, address[] calldata path, address to, uint256 deadline) external returns (uint256[] memory amounts);
-}
+contract Exchangerv2 {
 
-contract swapperv2 {
-    address private feeReciepeint;
-    address private constant UNISWAP_ROUTER_ADDRESS =0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D ;//ADDRRESS_UNISWAP_ROUTER_V2; Replace current must
+    address public feeReciepeint;
+    address private constant UNISWAP_ROUTER_ADDRESS =0x3aF9929A6f53a729E62ED57CF1187Ea99c2Ba08B ;//ADDRRESS_UNISWAP_ROUTER_V2; Replace current must
     IUniswapV2Router02 private uniswapRouter;
-    address private owner;
+    address public owner;
+    IUniswapV2Factory public uniswapFactory;
 
-    constructor() {
+    constructor(address _uniswapFactory) {
         uniswapRouter = IUniswapV2Router02(UNISWAP_ROUTER_ADDRESS);
+        uniswapFactory = IUniswapV2Factory(_uniswapFactory);
         owner = msg.sender;
     }
 
@@ -67,4 +66,13 @@ contract swapperv2 {
     }
     emit SwapExecuted(tokenIn, tokenOut, amountInAdjusted, swapAmounts[1], to);
 }
+
+   function getPoolData(address _token1, address _token2) public view returns (uint256 reserve1, uint256 reserve2, uint256 totalSupply) {
+        address pair = uniswapFactory.getPair(_token1, _token2);
+        IUniswapV2Pair uniswapPair = IUniswapV2Pair(pair);
+        (uint256 _reserve1, uint256 _reserve2, uint256 _totalSupply) = uniswapPair.getReserves();
+        reserve1 = _reserve1;
+        reserve2 = _reserve2;
+        totalSupply = _totalSupply;
+    }
 }
