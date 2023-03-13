@@ -1,5 +1,5 @@
 {
-  "name": "hardhat-javascript-starter",
+  "name": "AggregateDex",
   "scripts": {
     "build": "npx thirdweb@latest detect",
     "deploy": "npx thirdweb@latest deploy",

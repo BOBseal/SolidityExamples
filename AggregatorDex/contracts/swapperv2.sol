@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity >=0.7.0;
 
 interface IERC20 {
     function transfer(address recipient, uint256 amount) external returns (bool);
@@ -11,7 +11,7 @@ interface IUniswapV2Router02 {
 
 contract swapperv2 {
     address private feeReciepeint;
-    address private constant UNISWAP_ROUTER_ADDRESS =0x3aF9929A6f53a729E62ED57CF1187Ea99c2Ba08B ;//ADDRRESS_UNISWAP_ROUTER_V2; Replace current must
+    address private constant UNISWAP_ROUTER_ADDRESS =0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D ;//ADDRRESS_UNISWAP_ROUTER_V2; Replace current must
     IUniswapV2Router02 private uniswapRouter;
     address private owner;
 
