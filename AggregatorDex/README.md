@@ -1,3 +1,5 @@
+## ABOUT
+This is a Simple Contract that allows swapping tokens from uniswap v2 pools and has a fee of 0.1% for each swap...
 
 ## Building the project
 
