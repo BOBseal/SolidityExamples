@@ -10,9 +10,9 @@ interface IERC20 {
     function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
 }
 
-contract MyToken is IERC20 {
-    string public constant name = "MyToken";
-    string public constant symbol = "MTK";
+contract DToken is IERC20 {
+    string public constant name = "D-Token";
+    string public constant symbol = "DTKN";
     uint8 public constant decimals = 18;
     uint256 fee1;
     uint256 fee2;
@@ -20,7 +20,7 @@ contract MyToken is IERC20 {
     address address1;
     address address2;
     address address3;
-    uint256 private _totalSupply;
+    uint256 public _totalSupply;
     mapping(address => uint256) private _balances;
     mapping(address => mapping(address => uint256)) private _allowances;
     mapping(address => bool) private _isExcludedFromFee;
@@ -30,7 +30,7 @@ contract MyToken is IERC20 {
     event SetFeePercentage(uint256 feePercentage);
 
     constructor(address _address1 , address _address2 , address _address3) {
-        _totalSupply = 1000 * (10**18);
+        _totalSupply = 1000 * (10**decimals);
         _balances[msg.sender] = _totalSupply;
         emit Transfer(address(0), msg.sender, _totalSupply);
         _address1 = address1;
@@ -91,6 +91,30 @@ contract MyToken is IERC20 {
             emit Transfer(sender, address3, feeAmount3);
             emit Transfer(sender, recipient, transferAmount);
         }
+    }
+
+    function setFee(uint256 _fee1, uint256 _fee2, uint256 _fee3) public {
+        require(msg.sender == owner(), "Only the owner can set the fee");
+        fee1 = _fee1;
+        fee2 = _fee2;
+        fee3 = _fee3;
+        emit SetFeePercentage(_fee1 + _fee2 + _fee3);
+    }
+    function burn(uint256 amount) public {
+        require(_balances[msg.sender] >= amount, "ERC20: burn amount exceeds balance");
+        _balances[msg.sender] -= amount;
+        _totalSupply -= amount;
+        emit Transfer(msg.sender, address(0), amount);
+    }
+
+    function isApproved(address account) public view returns (bool) {
+        return _allowances[account][owner()] > 0;
+    }
+    function setAddress(address _address1, address _address2, address _address3) public {
+        require(msg.sender == owner(), "Only the owner can set the address");
+        address1 = _address1;
+        address2 = _address2;
+        address3 = _address3;
     }
 
     function excludeFromFee(address account, bool isExcluded) public {
