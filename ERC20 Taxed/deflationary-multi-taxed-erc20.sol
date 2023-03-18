@@ -2,6 +2,7 @@
 pragma solidity ^0.8.17;
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
 contract DToken is IERC20 {
     using SafeMath for uint256;
     string public constant name = "D-Token";
@@ -21,13 +22,16 @@ contract DToken is IERC20 {
     event ExcludeFromFee(address indexed account, bool isExcluded);
     event SetFeePercentage(uint256 feePercentage);
 
-    constructor(address _address1 , address _address2) {
+    constructor(address _feereceiever1 , address _feereceiever2 , uint256 feea , uint256 feeb, uint256 feec) {
         _totalSupply = 1000 * (10**18);
         _balances[msg.sender] = _totalSupply;
         emit Transfer(address(0), msg.sender, _totalSupply);
-        address1 = _address1; // assign argument to state variable
-        address2 = _address2; // assign argument to state variable
+        address1 = _feereceiever1; // fee recieving wallets
+        address2 = _feereceiever2; 
         address3 = add;
+        fee1 = feea;  // 1 = 0.01%
+        fee2 = feeb;
+        fee3 = feec;
     }
 
     function totalSupply() public view override returns (uint256) {
