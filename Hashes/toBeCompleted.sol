@@ -1,9 +1,17 @@
 //SPDX-LICENSE-IDENTIFIER: MIT
 pragma solidity ^0.8.17;
 
-contract HashGen {
-
-    function generateHash(uint256 data1, string memory data2, bool data3) internal pure returns (bytes32) {
+contract MultiHasher {
+    uint256 private nonce = 0;
+    modifier validUint256(uint256 data) {
+        require(data >= 0, "Invalid uint256 value");
+        _;
+    }
+    modifier nonEmptyString(string memory data) {
+        require(bytes(data).length > 0, "Empty string");
+        _;
+    }
+    function generateHash(uint256 data1, string memory data2, bool data3) external pure validUint256(data1) nonEmptyString(data2) returns (bytes32) {
         string memory s1 = uint256ToString(data1);
         string memory s2 = data2;
         string memory s3 = boolToString(data3);
@@ -30,48 +38,29 @@ contract HashGen {
         }
         return string(buffer);
     }
-
-    function stringToUint256(string memory str) internal pure returns (uint256 result) {
-        bytes memory b = bytes(str);
-        uint256 i;
-        result = 0;
-        for (i = 0; i < b.length; i++) {
-            uint256 c = uint256(uint8(b[i]));
-            if (c >= 48 && c <= 57) {
-                result = result * 10 + (c - 48);
-            }
-        }
-    }
-
-    function stringToBool(string memory str) internal pure returns (bool result) {
-        bytes memory b = bytes(str);
-        if (b.length == 1) {
-            uint256 c = uint256(uint8(b[0]));
-            if (c == 49) {
-                result = true; // "1" character
-            } else if (c == 48) {
-                result = false; // "0" character
-            }
-        }
-    }
-
-    function boolToString(bool value) internal pure returns (string memory) {
+    function boolToString(bool value) public pure returns (string memory) {
         return value ? "true" : "false";
     }
-
-    function generateStringHash(string memory data) internal pure returns (bytes32) {
+     function generateStringHash(string memory data) external pure nonEmptyString(data) returns (bytes32) {
         bytes memory dataBytes = bytes(data);
         bytes32 hash = keccak256(dataBytes);
         return hash;
     }
-
-    function generateUint256Hash(uint256 data) internal pure returns (bytes32) {
+    function generateUint256Hash(uint256 data) external pure validUint256(data) returns (bytes32){
         bytes32 hash = keccak256(abi.encodePacked(data));
         return hash;
     }
-
-    function generateBoolHash(bool data) internal pure returns (bytes32) {
+    function generateBoolHash(bool data) external pure returns (bytes32) {
         bytes32 hash = keccak256(abi.encodePacked(data));
         return hash;
     }
+    function hashOfTwoHashes(bytes32 hash1, bytes32 hash2) external pure returns (bytes32) {
+        return keccak256(abi.encodePacked(hash1, hash2));
+    }
+    function generateRandomHash() public returns(bytes32){
+        uint256 randomNumber = uint256(keccak256(abi.encodePacked(block.timestamp, msg.sender, nonce))) % (2**256 - 1);
+        nonce++;
+        bytes32 hash = keccak256(abi.encodePacked(randomNumber));
+        return hash;
+    } 
 }
