@@ -2,6 +2,7 @@
 pragma solidity ^0.8.17;
 
 contract HashGenerator {
+    //hash gen from 3 diff data types
     function generateHash(uint256 data1, string memory data2, bool data3) public pure returns (bytes32) {
         string memory s1 = uint256ToString(data1);
         string memory s2 = data2;
@@ -10,7 +11,7 @@ contract HashGenerator {
         bytes32 hash = keccak256(data);
         return hash;
     }
-
+//helpers
     function uint256ToString(uint256 value) internal pure returns (string memory) {
         if (value == 0) {
             return "0";
