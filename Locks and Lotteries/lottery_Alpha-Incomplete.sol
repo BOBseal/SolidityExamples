@@ -92,7 +92,7 @@ contract Lottery {
         
         ISwapRouter.ExactInputParams memory params =
         ISwapRouter.ExactInputParams({
-            path: abi.encodePacked(Stable1, poolFee, Stable2, poolFee, WETH),
+            path: abi.encodePacked(LottoToken, poolFee, WETH, poolFee, Stable1),
             recipient: msg.sender,
             deadline: block.timestamp,
             amountIn: f,
