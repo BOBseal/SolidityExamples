@@ -15,6 +15,11 @@ contract Lottery {
         uint256 LottosParticipated;
         bool ClaimedLastParticipation;
     }
+    struct lottosList{
+        address[] winnerList;
+        address[] participantList;
+        uint256 forLottoNo;
+    }
     string public LottoTopic;
     address public Stable1 = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
     address public WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
@@ -36,9 +41,9 @@ contract Lottery {
     
 
     mapping (address => UserInfo) private LottoUserInfo;
+    mapping (uint256 =>lottosList) private lottoUserList;
     mapping(address => mapping(address => uint256)) private lockedBalances;
     mapping(address => bool) private hasParticipated;
-    address[] private participantList;
 
     event NewLottoStarted(uint256 indexed LottoCounter, uint256 indexed TicketPrice, uint256 indexed MaxParticipantCap);
     event ParticipantRegistered(address indexed participant, uint256 indexed ticketPrice);
@@ -79,11 +84,12 @@ contract Lottery {
     
     function Participate() public {
         UserInfo storage userInfo = LottoUserInfo[msg.sender];
+        lottosList storage lottolist = lottoUserList[CurrentLottoCounter];
         uint256 balance = GetTokenBal(msg.sender);
         require(started,"lotto not started"); 
         require(!hasParticipated[msg.sender], "User has already participated");
         require(balance >0 , "Not Enough Balance of Tokens to buy TICKET" );
-        require(participantList.length < MaxParticipantCap, "Max participants reached");
+        require(lottolist.participantList.length < MaxParticipantCap, "Max participants reached");
         require(userInfo.ClaimedLastParticipation,"Claim Your Last Participation Rewards Before Participating");
         IERC20(LottoToken).transferFrom(msg.sender, address(this), CurrentTicketPrice);
         uint256 f = CurrentTicketPrice.mul(feeAmount).div(10000);
@@ -103,7 +109,7 @@ contract Lottery {
         Treasury.add(amountOut);
         Lock(msg.sender, toLockAndPool);
         RewardPool = RewardPool.add(toLockAndPool);
-        participantList.push(msg.sender);
+        lottolist.participantList.push(msg.sender);
         hasParticipated[msg.sender] = true;
         userInfo.LottosParticipated = userInfo.LottosParticipated.add(1);
         emit ParticipantRegistered(msg.sender, CurrentTicketPrice);
@@ -116,20 +122,20 @@ contract Lottery {
 
     function claim() public {
         UserInfo storage userInfo = LottoUserInfo[msg.sender];
+        lottosList storage lottolist = lottoUserList[CurrentLottoCounter.sub(1)];
         require(ended, "Lotto has not ended");
         require(!userInfo.ClaimedLastParticipation, "User has already claimed their last participation");
         require(hasParticipated[msg.sender], "User Needs to Participate to Be eligible to Claim");
-        address[] memory winners = CalculateWinners(); 
         bool isWinner = false;
-        for (uint256 i = 0; i < winners.length; i++) {
-            if (winners[i] == msg.sender) {
+        for (uint256 i = 0; i < lottolist.winnerList.length; i++) {
+            if (lottolist.winnerList[i] == msg.sender) {
                 isWinner = true;
                 break;
             }
         }
         uint256 userReward = 0;
         if(isWinner){
-        userReward = RewardPool.div(winners.length);
+        userReward = RewardPool.div(lottolist.winnerList.length);
         RewardPool = RewardPool.sub(userReward);
         IERC20(LottoToken).transfer(msg.sender, lockedBalances[LottoToken][msg.sender].add(userReward));
         userInfo.totalAmountWon = userInfo.totalAmountWon.add(lockedBalances[LottoToken][msg.sender]).add(userReward);
@@ -142,31 +148,33 @@ contract Lottery {
         }
     }
     function CalculateWinners() internal returns (address[] memory) {
+        lottosList storage lottolist = lottoUserList[CurrentLottoCounter];
         require(ended, "Lotto not ended");
-        uint256 participants = participantList.length;
+        uint256 participants = lottolist.participantList.length;
         address[] memory winners = new address[](10);
         for (uint256 i = 0; i < 10; i++) {
             uint256 winnerIndex = uint256(keccak256(abi.encodePacked(block.timestamp, i))) % participants;
             address winner = address(0);
             for (uint256 j = winnerIndex; j < participants; j++) {
-                if (!hasParticipated[participantList[j]]) {
+                if (!hasParticipated[lottolist.participantList[j]]) {
                     continue;
                 }
-                winner = participantList[j];
+                winner = lottolist.participantList[j];
                 break;
             }
             if (winner == address(0)) {
                 for (uint256 j = 0; j < winnerIndex; j++) {
-                    if (!hasParticipated[participantList[j]]) {
+                    if (!hasParticipated[lottolist.participantList[j]]) {
                         continue;
                     }
-                    winner = participantList[j];
+                    winner = lottolist.participantList[j];
                     break;
                 }
             }
             winners[i] = winner;
             hasParticipated[winner] = false;
         }
+        lottolist.winnerList = winners;
         return winners;
     }
 
