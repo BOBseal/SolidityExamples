@@ -170,24 +170,28 @@ contract Token is IERC20 ,ReentrancyGuard{
     }
     function excludeFromFee(address account) external {
         require(msg.sender == owner() || AdminList[msg.sender].accessLevel >=2, "Permission Needed to Execute");
+        require(isAdmin[account] == false && account != owner() , "Account Cannot be Admin Account");
         require(_isExcludedFromFee[account] == false ,"account already excluded");
         _isExcludedFromFee[account] = true;
         emit ExcludeFromFee(account, true);
     }
     function includeInFee(address account) external {
-        require(msg.sender == owner() || AdminList[msg.sender].accessLevel >=3, "Permission Needed to Execute");
+        require(msg.sender == owner() || AdminList[msg.sender].accessLevel >=2, "Permission Needed to Execute");
+        require(isAdmin[account] == false && account != owner() , "Account Cannot be Admin Account");
         require(_isExcludedFromFee[account] == true ,"account already included");
         _isExcludedFromFee[account] = false;
         emit ExcludeFromFee(account, false);
     }
     function excludeFromTxLimit(address account) external {
         require(msg.sender == owner() || AdminList[msg.sender].accessLevel >=2, "Permission Needed to Execute");
+        require(isAdmin[account] == false && account != owner() , "Account Cannot be Admin Account");
         require(_excludedFromTxLimit[account] == false , "account already excluded");
         _excludedFromTxLimit[account] = true;
     }
     function includeInTxLimit(address account) external{
-        require(msg.sender == owner() || AdminList[msg.sender].accessLevel >=3, "Permission Needed to Execute");
+        require(msg.sender == owner() || AdminList[msg.sender].accessLevel >=2, "Permission Needed to Execute");
         require(_excludedFromTxLimit[account] == true , "account already included");
+        require(isAdmin[account] == false && account != owner() , "Account Cannot be Admin Account");
         _excludedFromTxLimit[account] = false;
     }
     function isExcludedFromFee(address account) external view returns (bool) {
