@@ -53,7 +53,7 @@ contract DToken is IERC20 ,ReentrancyGuard{
     }
 
     function changeNameNdLogo(string memory newname , string memory newsymbol) external {
-        require(isAdmin[msg.sender] == true || msg.sender == owner() , "Not An Admin");
+        require(msg.sender == owner() , "Not An Admin");
         name = newname;
         symbol = newsymbol;
         emit Rebrand(newname , newsymbol , block.timestamp);
