@@ -9,8 +9,8 @@ contract DToken is IERC20 ,ReentrancyGuard{
     struct Admins{
         address user;
     }
-    string public name = "AXOMEE TOKEN";
-    string public symbol ="AXOM";
+    string public name;
+    string public symbol;
     string private tokenLogo;
     uint256 public constant decimals = 18;
     uint256 public fee1;
@@ -22,7 +22,7 @@ contract DToken is IERC20 ,ReentrancyGuard{
     address public address2;
     address public address3;
     uint256 public _totalSupply;
-    mapping(address=>bool) isAdmin;
+    mapping(address=>bool) private isAdmin;
     mapping(address => uint256) private _balances;
     mapping(address => mapping(address => uint256)) private _allowances;
     mapping(address => bool) private _isExcludedFromFee;
@@ -147,8 +147,7 @@ contract DToken is IERC20 ,ReentrancyGuard{
     }
     function burn(uint256 amount) external nonReentrant {
         require(_balances[msg.sender] >= amount, "ERC20: burn amount exceeds balance");
-        _balances[msg.sender] -= amount;
-        _totalSupply -= amount;
+        _transfer(msg.sender , address(0), amount);
         emit Transfer(msg.sender, address(0), amount);
     }
     function isApproved(address account) external view returns (bool) {
