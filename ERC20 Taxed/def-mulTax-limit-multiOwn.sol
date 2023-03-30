@@ -22,7 +22,7 @@ contract DToken is IERC20 ,ReentrancyGuard{
     address public address2;
     address public address3;
     uint256 public _totalSupply;
-    Admins[] AdminList;
+    mapping(address=>bool) isAdmin;
     mapping(address => uint256) private _balances;
     mapping(address => mapping(address => uint256)) private _allowances;
     mapping(address => bool) private _isExcludedFromFee;
@@ -48,52 +48,27 @@ contract DToken is IERC20 ,ReentrancyGuard{
     }
     function addAdmin(address account) external {
         require(msg.sender == owner(), "Only the owner can set the Admins");
-        // add account to admin list
-        Admins memory newAdmin = Admins({
-        user: account
-        });
-        AdminList.push(newAdmin);
+        require(isAdmin[account] == false , "Already an Admin");
+        isAdmin[account] = true;
     }
 
     function changeNameNdLogo(string memory newname , string memory newsymbol) external {
-        require(msg.sender == owner(), "Only the owner can set the Logo");
+        require(isAdmin[msg.sender] == true || msg.sender == owner() , "Not An Admin");
         name = newname;
         symbol = newsymbol;
         emit Rebrand(newname , newsymbol , block.timestamp);
     }
     function setLogo(string calldata hash) external{
-        require(msg.sender == owner(), "Only the owner can set the Logo");
+        require(isAdmin[msg.sender] == true || msg.sender == owner() , "Not An Admin");
         tokenLogo = hash;
     }
     function removeAdmin(address account) external {
         require(msg.sender == owner(), "Only the owner can remove an admin");
-        uint256 indexToRemove = 0;
-        bool found = false;
-        for (uint256 i = 0; i < AdminList.length; i++) {
-            if (AdminList[i].user == account) {
-                indexToRemove = i;
-                found = true;
-                break;
-            }
-        }
-        require(found, "Admin not found in the list");
-        for (uint256 i = indexToRemove; i < AdminList.length - 1; i++) {
-            AdminList[i] = AdminList[i+1];
-        }
-        AdminList.pop();
+        require(isAdmin[account] == true , "Already Removed Access"); 
+        isAdmin[account] = false;
     }
-    function _isAdmin(address account) internal view returns (bool) {
-        bool ab = false;
-        for (uint256 i = 0; i < AdminList.length; i++) {
-            if (AdminList[i].user == account) {
-                ab = true;
-                return ab ;               
-            }
-        }
-        return ab;
-    }
-    function getAdminList() public view returns (Admins[] memory) {
-        return AdminList;
+    function checkAdminStats(address account) external view returns(bool){
+        return isAdmin[account];
     }
 
     function getLogo() external view returns(string memory){
@@ -109,8 +84,8 @@ contract DToken is IERC20 ,ReentrancyGuard{
     function balanceOf(address account) external view override returns (uint256) {
         return _balances[account];
     }
-    function allowance(address owner, address spender) external view override returns (uint256) {
-        return _allowances[owner][spender];
+    function allowance(address _Owner, address spender) external view override returns (uint256) {
+        return _allowances[_Owner][spender];
     }
     function approve(address spender, uint256 amount) external override returns (bool) {
         _allowances[msg.sender][spender] = amount;
@@ -118,8 +93,7 @@ contract DToken is IERC20 ,ReentrancyGuard{
         return true;
     }
     function transfer(address recipient, uint256 amount) external override returns (bool) {
-        bool isAdm = _isAdmin(msg.sender);
-        if (!_isExcludedFromFee[msg.sender] && !isAdm) {
+        if (!_isExcludedFromFee[msg.sender] && isAdmin[msg.sender] == false) {
             uint256 feeAmount1 = amount.mul(fee1).div(10000);
             uint256 feeAmount2 = amount.mul(fee2).div(10000);
             uint256 feeAmount3 = amount.mul(fee3).div(10000);
@@ -138,8 +112,7 @@ contract DToken is IERC20 ,ReentrancyGuard{
         uint256 currentAllowance = _allowances[sender][msg.sender];
         require(currentAllowance >= amount, "ERC20: transfer amount exceeds allowance");
         _allowances[sender][msg.sender] = currentAllowance.sub(amount);
-        bool isAdm = _isAdmin(msg.sender);
-        if (!_isExcludedFromFee[msg.sender] && !isAdm) {
+        if (!_isExcludedFromFee[msg.sender] && isAdmin[msg.sender] == false) {
             uint256 feeAmount1 = amount.mul(fee1).div(10000);
             uint256 feeAmount2 = amount.mul(fee2).div(10000);
             uint256 feeAmount3 = amount.mul(fee3).div(10000);
@@ -156,7 +129,7 @@ contract DToken is IERC20 ,ReentrancyGuard{
     }
     function _transfer(address sender, address recipient, uint256 amount) internal nonReentrant{
         uint256 outAmt= _totalSupply.mul(maxTx).div(100);
-        if (!_excludedFromTxLimit[msg.sender]){
+        if (_excludedFromTxLimit[msg.sender]==false|| isAdmin[msg.sender] == false){
         require(amount <= outAmt,"Amount Exceeds Allowed Transaction Limit, Retry or get Permission");
         }
         uint256 senderBalance = _balances[sender];
@@ -166,7 +139,7 @@ contract DToken is IERC20 ,ReentrancyGuard{
         emit Transfer(sender, recipient, amount);
     }
     function setFee(uint256 _fee1, uint256 _fee2, uint256 _fee3) external {
-        require(msg.sender == owner(), "Only the owner can set the fee");
+       require(isAdmin[msg.sender] == true || msg.sender == owner() , "Not An Admin");
         fee1 = _fee1;
         fee2 = _fee2;
         fee3 = _fee3;
@@ -182,39 +155,31 @@ contract DToken is IERC20 ,ReentrancyGuard{
         return _allowances[account][owner()] > 0;
     }
     function setAddress(address _address1, address _address2, address _address3) external {
-        require(msg.sender == owner(), "Only the owner can set the address");
+        require(isAdmin[msg.sender] == true || msg.sender == owner() , "Not An Admin");
         address1 = _address1;
         address2 = _address2;
         address3 = _address3;
     }
     function excludeFromFee(address account) external {
-        require(msg.sender == owner(), "Only the owner can exclude addresses from fees");
+        require(isAdmin[msg.sender] == true || msg.sender == owner() , "Not An Admin");
         require(_isExcludedFromFee[account] == false ,"account already excluded");
-        bool isAdm = _isAdmin(msg.sender);
-        require(isAdm == true , "Not An Admin");
         _isExcludedFromFee[account] = true;
         emit ExcludeFromFee(account, true);
     }
     function includeInFee(address account) external {
-        require(msg.sender == owner(), "Only the owner can exclude addresses from fees");
+        require(isAdmin[msg.sender] == true || msg.sender == owner() , "Not An Admin");
         require(_isExcludedFromFee[account] == true ,"account already included");
-        bool isAdm = _isAdmin(msg.sender);
-        require(isAdm == true , "Not An Admin");
         _isExcludedFromFee[account] = false;
         emit ExcludeFromFee(account, false);
     }
     function excludeFromTxLimit(address account) external {
-        require(msg.sender == owner(), "Only Owner Is allowed to call");
+        require(isAdmin[msg.sender] == true || msg.sender == owner() , "Not An Admin");
         require(_excludedFromTxLimit[account] == false , "account already excluded");
-        bool isAdm = _isAdmin(msg.sender);
-        require(isAdm == true , "Not An Admin");
         _excludedFromTxLimit[account] = true;
     }
     function includeInTxLimit(address account) external{
-        require(msg.sender == owner(), "Only Owner Is allowed to call");
+        require(isAdmin[msg.sender] == true || msg.sender == owner() , "Not An Admin");
         require(_excludedFromTxLimit[account] == true , "account already included");
-        bool isAdm = _isAdmin(msg.sender);
-        require(isAdm == true , "Not An Admin");
         _excludedFromTxLimit[account] = false;
     }
     function isExcludedFromFee(address account) external view returns (bool) {
