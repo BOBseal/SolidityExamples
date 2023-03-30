@@ -5,10 +5,10 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20BurnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20VotesUpgradeable.sol";
 
-contract DToken is IERC20 {
+contract DToken is IERC20{
     using SafeMath for uint256;
-    string public name = "A TOKEN";
-    string public symbol ="A";
+    string public name = "AXOMEE TOKEN";
+    string public symbol ="AXOM";
     string private tokenLogo;
     uint256 public constant decimals = 18;
     uint256 fee1;
