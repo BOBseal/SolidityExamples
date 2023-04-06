@@ -65,5 +65,11 @@ contract Locker is Ownable , ReentrancyGuard{
         _owners[toRemove] = Time(0, block.timestamp);
         emit OwnerRemoved(toRemove , block.timestamp);
     }
+    function CheckStat(address adminAddr) external view returns(uint256 , uint256) {
+        return (_owners[adminAddr].timestampOfAccessGrant, _owners[adminAddr].timestampOfAccessRemove);
+    }
+    function hasAdminAccess(address AddressToCheck) external view returns(bool){
+        return _HasAccess[AddressToCheck];
+    }
 
 }
