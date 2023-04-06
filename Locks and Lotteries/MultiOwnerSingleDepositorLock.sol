@@ -16,7 +16,7 @@ contract Locker is Ownable , ReentrancyGuard{
     }
 
     address private Owner;
-
+    
     mapping (address => uint256) private _balancesEth;
     mapping (address => Time) private _owners;
     mapping(address => bool) private _HasAccess;
@@ -32,20 +32,19 @@ contract Locker is Ownable , ReentrancyGuard{
         Owner = Primary_owner; //nft contract
     }
     function LockEther(uint256 amount) external payable nonReentrant returns(bool){
-        require (_HasAccess[msg.sender] == true || msg.sender == Owner , "DO NOT HAVE ACCESS");
+        require ( msg.sender == Owner , "DO NOT HAVE ACCESS");
         require(amount > 0, "Cannot lock 0 Ether");
-        require(msg.value >= amount, "Insufficient Ether");
+        require(msg.value == amount, "Amount sent does not match specified amount");
         _balancesEth[msg.sender] = _balancesEth[msg.sender].add(amount);
-        emit EtherLocked(msg.sender, amount, block.timestamp);
+        emit EtherLocked(msg.sender, msg.value, block.timestamp);
         return true;
     }
-    function WithdrawEther(uint256 amount) external payable nonReentrant returns(bool){
-        require (_HasAccess[msg.sender] == true , "DO NOT HAVE ACCESS");
+    function WithdrawEther(uint256 amount) external nonReentrant returns(bool){
+        require (_HasAccess[msg.sender] == true || msg.sender == Owner, "DO NOT HAVE ACCESS");
         require(amount > 0, "Cannot Withdraw 0 Ether");
-        uint256 balance = _balancesEth[Owner]; // gets the deposit balance of inheriting contract
-        require(balance > amount, "No Ether Balance to withdraw");
-        _balancesEth[msg.sender] = balance.sub(amount);
-        payable(msg.sender).transfer(amount);
+        (bool sent, ) = msg.sender.call{value: amount}("");
+        require(sent, "Failed to send Ether");
+        _balancesEth[Owner] = _balancesEth[Owner].sub(amount);
         emit EtherWithdrawn(msg.sender, amount, block.timestamp);
         return true;
     }
@@ -85,4 +84,5 @@ contract Locker is Ownable , ReentrancyGuard{
         emit PrimaryOwnerChanged(newOwner , block.timestamp);
         return true;
     }
+    receive() external payable {}
 }
