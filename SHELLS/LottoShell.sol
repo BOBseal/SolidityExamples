@@ -1,22 +1,25 @@
-//AN EXAMPLE SHELL/Framework for Lotteries
-
-
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol"; 
 
-contract EtherLottery is ReentrancyGuard , Ownable{
-    using SafeMath for uint256;
+interface CoreRandomiser {
+    function requestRandomUint256_(uint256 seed) external payable returns (uint256);
+}
 
+contract Lottery is ReentrancyGuard , Ownable{
+    using SafeMath for uint256;
+    
+    CoreRandomiser private randomiser;
+    address public stableCoin;
+    
     uint256 public maxParticipants;
     uint256 public ticketPriceInWei;
     uint256 public OperatorShare;
     uint256 public duration;
-    uint256 private Nonce;
     uint256 public roundCounter;
 
     struct Lotto{
@@ -25,17 +28,15 @@ contract EtherLottery is ReentrancyGuard , Ownable{
         address[] losers;
         uint256 roundId;
         uint256 totalPool;
-        uint256 rewardPool;
-        bool participationTimeOver;
-        bool fundsDistributed;
+        uint256 participationTimeOver;
         uint256 startTime;
         uint256 endTime;
         uint256 distributionTime;
+        bool fundsDistributed;
     }
 
     mapping(uint256 => Lotto) public lottoRounds;
     mapping(address => bool) public operators;
-    mapping(address => bool) public allowedFeeTokens;
 
     event NewRoundStarted(uint256 indexed roundNumber, uint256 indexed Time);
     event ParitcationTimeOver(uint256 indexed roundNumber , uint256 Time);
@@ -45,16 +46,15 @@ contract EtherLottery is ReentrancyGuard , Ownable{
         uint256 _maxParticipants,
         uint256 _ticketPriceInWei,
         uint256 _feePercent,
-        uint256 _LotteryDurationInSeconds,
-        address _token
+        address _token,
+        address randomiserAddress
     ){
-        roundCounter = 1;
-        Nonce =  1;
-        allowedFeeTokens[_token] = true;
+        stableCoin = _token;
         maxParticipants = _maxParticipants;
         ticketPriceInWei = _ticketPriceInWei;
         OperatorShare = _feePercent;
-        duration = _LotteryDurationInSeconds;  
+        randomiser = CoreRandomiser(randomiserAddress);
+        duration = uint256(7).mul(day());  
     }
 
     modifier isAllowed()  {
@@ -62,19 +62,16 @@ contract EtherLottery is ReentrancyGuard , Ownable{
         _;
     }
 
+    function day()internal pure returns(uint256){
+        return 86400;
+    }
+
     function _isAllowedOP() internal view{
-        require(_msgSender() == owner() || operators[_msgSender()] == true,"Do Not Have Operator Level Access to call the Function");
+        require(_msgSender() == owner() || operators[_msgSender()] == true || msg.sender == address(this),"Do Not Have Operator Level Access to call the Function");
     }
-   
-    function r2(uint256 seed)internal view returns (uint256) {
-        uint256 nonce = Nonce;
-        Nonce.add(1);
-        return uint256(keccak256(abi.encodePacked(~uint256(0) - nonce * block.timestamp, roundCounter * nonce, roundCounter * block.timestamp , seed , seed * nonce))); 
-    }
-    function r1(uint256 key)public view returns (bytes32) {
-        uint256 seed  = r2(key);
-        uint256 nonce = Nonce;
-        return keccak256(abi.encodePacked(roundCounter * nonce, roundCounter ,seed , seed * nonce)); 
+
+    function randomUint(uint256 _seed) public returns (uint256) {
+        return randomiser.requestRandomUint256_(_seed);
     }
 
     function addOperator(address operator) external isAllowed {
@@ -87,27 +84,84 @@ contract EtherLottery is ReentrancyGuard , Ownable{
         operators[operator] = false;
     }
 
-    function addFeeToken(address token) external isAllowed {
+    function changeFeeToken(address token) external isAllowed {
         require(token != address(0), "Invalid token address");
-        allowedFeeTokens[token] = true;
+        stableCoin = token;
     }
 
-    function removeFeeToken(address token) external isAllowed {
-        require(token != address(0), "Invalid token address");
-        allowedFeeTokens[token] = false;
+    function getFeeTokenAddress() public view returns(address){
+        return stableCoin;
     }
 
-    function getCurrentLotteryId() public view returns(uint256){
+    function changeFee(uint256 feeInWei) public isAllowed{
+        OperatorShare = feeInWei;
+    }
+
+    function changeDuration(uint256 timeInSeconds) public isAllowed{
+        duration = timeInSeconds;
+    }
+
+    function currentRoundId() public view returns(uint256){
         return roundCounter.sub(1);
     }
 
-    function startNewLotto()public isAllowed{}
+    function isParticipantForRound(uint256 roundNumber, address participant) public view returns (bool) {
+        require(roundNumber <= roundCounter, "Invalid round number");
+        address[] memory participants = lottoRounds[roundNumber].participants;
+        for (uint256 i = 0; i < participants.length; i++) {
+            if (participants[i] == participant) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function isLoserForRound(uint256 roundNumber, address loser) public view returns (bool) {
+        require(roundNumber <= roundCounter, "Invalid round number");
+        address[] memory losers = lottoRounds[roundNumber].losers;
+        for (uint256 i = 0; i < losers.length; i++) {
+            if (losers[i] == loser) {
+                return true;
+            }
+        }   
+        return false;
+    }
+
+    function isWinnerForRound(uint256 roundNumber, address winner) public view returns (bool) {
+        require(roundNumber <= roundCounter, "Invalid round number");
+        address[] memory winners = lottoRounds[roundNumber].winners;
+        for (uint256 i = 0; i < winners.length; i++) {
+            if (winners[i] == winner) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function startNewRound()public isAllowed{
+        require(lottoRounds[currentRoundId()].fundsDistributed || block.timestamp >= lottoRounds[currentRoundId()].endTime, "Previous round is still ongoing");
+        roundCounter.add(1);
+        lottoRounds[roundCounter].roundId = roundCounter;
+        lottoRounds[roundCounter].startTime = block.timestamp;
+        lottoRounds[roundCounter].endTime = block.timestamp.add(duration);
+        uint256 dur = day().mul(2);
+        lottoRounds[roundCounter].participationTimeOver = block.timestamp.add(duration).sub(dur);
+        emit NewRoundStarted(roundCounter, block.timestamp);
+    }
     
-    function buyTicket() public nonReentrant{}
+    function buyTicket() public payable nonReentrant{
+        require(IERC20(stableCoin).balanceOf(msg.sender) >= OperatorShare,"Fee Balance Not Enough");
+        require(isParticipantForRound(currentRoundId(), msg.sender) == true,"Already a Participant");
+        require(lottoRounds[currentRoundId()].participants.length < maxParticipants, "Max participants reached");
+        require(block.timestamp <= lottoRounds[roundCounter].participationTimeOver, "Participation time is over");
+        IERC20(stableCoin).transferFrom(msg.sender, address(this), OperatorShare);
+        lottoRounds[currentRoundId()].participants.push(msg.sender);
+        lottoRounds[currentRoundId()].totalPool = lottoRounds[currentRoundId()].totalPool.add(OperatorShare);
+    }
+
+    function distributeRewards() public isAllowed {}
 
     function selectWinners() internal {}
-
-    function distributeRewards() public {}
 
     function distributeToWinnders() internal{} // returns 80% of total Pool to winners 
 
